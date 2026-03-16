@@ -51,6 +51,9 @@ VR方法和其他常用方法对比如下：
 如，VR与regular / VCD在 ` LLaVA-Bench (in-the-wild) ` 上表现的对比。
 <p align='center'><img src="./images/vr-vs-regular-vcd.png" width=100%></p>
 
+且VR在推理延迟、内存开销上有着充分的优势：
+<p align='center'><img src="./images/latency-cost-comparison.png" width=100%></p>
+
 ### 理论分析
 
 ### 实验
