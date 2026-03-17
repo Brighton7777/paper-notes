@@ -38,14 +38,16 @@ $$
 这种聚合模式的出现和MLLM幻觉有强相关性。
 <p align='center'><img src="./images/split-number.png" width=85%></p>
 
-### Greedy 和 Beam Search
+### Greedy, Beam Search and Nucleus Sampling
 从数学形式看来，生成序列实际上就是**寻找概率最大的序列**，形式化地表示如下：
 $$
 \arg \max_y P(y | x)
 $$
-其中$P = \prod_{t = 1}^{T} P(y_t)$，为避免下溢常使用$\log P = \sum_{t = 1}^{T} P(y_t)$ 。
+其中$P = \prod_{t = 1}^{T} P(y_t)$，为避免下溢常使用$\log P = \sum_{t = 1}^{T} P(y_t)$ 
 贪心的方法就是在生成每个token时，总选择概率最大的token，但局部最优往往不是全局最有。
-但遍历整个空间的代价是不可接受的，因此，在效果和计算量的权衡中，就有了**Beam Search 束搜索**方法。
+一种“粗暴”的小改进是将每次选择“最大”改成在“在概率top-k大中随机选择一个”。
+沿着这种思路，又有一个改进就是从将“top-k”作为备选，变成以“top-p”，即以tokens排序后，取前$i$个tokens为备选，前$i$个tokens的概率和首次超过$p$，从中随机选择一个，又称为**Nucleus Sampling 核采样**。但仍然没有解决选项较少的问题。
+不过遍历整个空间的代价是不可接受的，因此，在效果和计算量的权衡中，就有了**Beam Search 束搜索**方法。
 Beam Search中需要一个**beam size 束宽**，即最多保留beam size个候选项，每个候选项是一个token序列，每次将所有候选项进行生成，将每个候选项的前beam size的token和原候选项整合后，得到beam size再作为新的候选项，再保留概率乘积较大的前beam size个候选项，以此循环。
 其实考虑Beam search的过程，会发现这是一个概率不断相乘，来筛选较优选项的方法，那么更长和更短的句子中，更短的句子概率往往更大，所以原始的beam search会**更偏向短句**。
 往往会使用 Length Normalization 的方法，适当地平衡长短句，具体如下：
@@ -94,7 +96,7 @@ $$
 $$
 \phi(\omega_{<t}) = \prod_{i=c}^{t-1} \sigma \omega_{i,c}, 
 \quad \text{s.t.} \quad 
-c = \arg\max_{t-k \le j \le t-1} \prod_{i=j}^{t-1} \sigma \omega_{i,j}
+c = \argmax_{t-k \le j \le t-1} \prod_{i=j}^{t-1} \sigma \omega_{i,j}
 $$
 进而将$\phi(w_{<t})$作为惩罚项，惩罚选择相应token的项，即：
 $$
@@ -117,4 +119,6 @@ $$
 其中$\mathbb{1}$表示真值函数，$Mode(\mathcal{C})$表示一个$\mathcal{C}$集合中的众数。
 若$N_{overlap} \ge r$，则会发生 **retrospection 回顾**，返回生成token s的位置重新选择其他tokens，同时总的回滚次数有上限$\beta$，如果返回$s$的次数超出了$\beta$，则会返回$s-1$。
 具体流程如下图：
-<p align='center'><img src="./images/retrospection-allocation.png" width=75%></p>
+<p align='center'><img src="./images/retrospection-allocation.png" width=70%></p>
+
+由于这篇文章相对较早，因此对比的方法在目前看来并不是那么优秀。总之，这篇文章针对**聚合模式**这一现象分析，提出了一种在**解码**阶段的幻觉缓解方法——OPERA。这种方法，主要由over-trust penalty和retrospcetion-allocation两部分组成。且具有不需要额外训练、不需要微调数据集、不需要外部知识。
