@@ -101,3 +101,20 @@ $$
 p(x_t|x_{<t}) = \text{softmax}(\mathcal{H}(h_t) - \alpha\phi(w_{\le t}))_{x_t}, \quad s.t. x_t \in \mathcal{Y}
 $$
 其中$\phi(w_{\le t})$表示由待选token整合得到的tokens序列的attention权重。
+整体流程如下图所示：
+<p align='center'><img src="./images/over-trust-penalty.png" width=75%></p>
+
+但由于聚合模式的发现具有滞后性，很可能即使尽力惩罚具有聚合模式的项，仍然无法打破前期就已经形成的聚合，因此我们需要一种"回滚"操作。
+重新思考聚合模式出现的原因，很可能是summary token后的某些token过于信任summary，但没有被penalty排除掉。想要解决这种情况，实际上我们只需要排除掉这些token，并重新选择其他token就能尝试解决，这就是**Retropection Allocation**。形式化地表述如下：
+$$
+\mathcal{C} = \{c|c=\argmax_{t-k\le j \le z} \prod_{i=j}^{z} \sigma w_{i,j}, z\in [t-l, t-1] \}
+$$
+即从attention的右下角开始，依次选择边长为$k, k-1, \ldots, 1$的正方形窗口向左上角移动，分别进行聚合模式的评估，并记录最大列权重乘积的列号，通常设置$l=k$。
+定义作为最大权重乘积次数最多的列对应的次数为$N_{overlap}$，具体公式如下：
+$$
+N_{overlap} = \sum_{c\in\mathcal{C}}\mathbb{1}_{c=s} \quad s.t. \quad s=Mode(\mathcal{C})
+$$
+其中$\mathbb{1}$表示真值函数，$Mode(\mathcal{C})$表示一个$\mathcal{C}$集合中的众数。
+若$N_{overlap} \ge r$，则会发生 **retrospection 回顾**，返回生成token s的位置重新选择其他tokens，同时总的回滚次数有上限$\beta$，如果返回$s$的次数超出了$\beta$，则会返回$s-1$。
+具体流程如下图：
+<p align='center'><img src="./images/retrospection-allocation.png" width=75%></p>
