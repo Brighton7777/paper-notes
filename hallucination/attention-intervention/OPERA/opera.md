@@ -24,6 +24,7 @@ V = X_eW_V
 $$
 其中$X_t$表示decoder hidden states，即目前已经生成的tokens，$X_e$表示encoder output。
 而在**跨模态的Cross-Attention**中，通过文本tokens$X_t$得到$Q$，视觉tokens$X_v$得到$K$和$V$，同时一般只更新$X_t$，而$X_v$在整个模型中保持不变，或通过**Self-Attention**更新。
+以llava为例，其并没有采用cross-attention进行模态融合，视觉特征会经过vision encoder转化为tokens，并进一步通过MLP投射到llama的input space，之后和prompt tokens一起生成后续的tokens。
 
 ### Columnar Attention Pattern
 
