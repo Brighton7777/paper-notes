@@ -33,7 +33,7 @@ $$
 
 <p align='center'><img src="./images/pattern-and-hallucination.png" width=75%></p>
 
-这种聚合模式在LLM中十分常见。一种假设是，发生这个现象的token，起到的是总结之前的tokens，并指导后续tokens生成的作用，**summary token**。这和NLP领域中观测到的一致，即LLM在浅层中，会在一些 `anchor token` 总结先前的信息，并在深层中依靠这些 `anchor token` 生成下一个token。
+这种聚合模式在LLM中十分常见。一种假设是，发生这个现象的token，起到的是总结之前的tokens，并指导后续tokens生成的作用，这些tokens被称作**summary token**。这和NLP领域中观测到的一致，即LLM在浅层中，会在一些 `anchor token` 总结先前的信息，并在深层中依靠这些 `anchor token` 生成下一个token。
 
 这种聚合模式的出现和MLLM幻觉有强相关性。
 <p align='center'><img src="./images/split-number.png" width=85%></p>
@@ -46,7 +46,7 @@ $$
 其中$P = \prod_{t = 1}^{T} P(y_t)$，为避免下溢常使用$\log P = \sum_{t = 1}^{T} P(y_t)$ 。
 贪心的方法就是在生成每个token时，总选择概率最大的token，但局部最优往往不是全局最有。
 但遍历整个空间的代价是不可接受的，因此，在效果和计算量的权衡中，就有了**Beam Search 束搜索**方法。
-Beam Search中需要一个**beam size 束宽**，即最多跟踪beam size个候选项，每次将所有候选项进行生成，再保留beam search个新的候选项。
+Beam Search中需要一个**beam size 束宽**，即最多保留beam size个候选项，每个候选项是一个token序列，每次将所有候选项进行生成，将每个候选项的前beam size的token和原候选项整合后，得到beam size再作为新的候选项，再保留概率乘积较大的前beam size个候选项，以此循环。
 其实考虑Beam search的过程，会发现这是一个概率不断相乘，来筛选较优选项的方法，那么更长和更短的句子中，更短的句子概率往往更大，所以原始的beam search会**更偏向短句**。
 往往会使用 Length Normalization 的方法，适当地平衡长短句，具体如下：
 
@@ -80,3 +80,24 @@ $$
 p(x_t|x_{<t})=\text{softmax}(\mathcal{H}(h_t))_{x_t}
 $$
 最终通过不同的解码策略，选择生成的token，并加入input text的末尾，进行下一轮生成。
+
+聚合模式在summary token生成时，并不能看出来，但经过几个token生成之后，这一模式就会变得明显。
+
+如何评估是否发生columar attention pattern？
+
+一个直觉的想法就是将每一列的self-attention的权重相乘，如果某一列的权重异常大，就是发生聚合现象。文章中就是这样做的，首先在**generated tokens**的self-attention中，选取了一个边长为$k$的正方形窗口，作为判断聚合模式的范围。同时对于多头注意力的情况，**会选择attention权重最大的头**归一化后作为研究对象。
+形式化来说：
+$$
+\textbf{W}_{t-1}^{k} = \{\textbf{w}^i\}_{i=t-k}^{t-1}, \quad s.t. \textbf{w}_i = \{ \sigma w_{i,j}\}_{i=t-k}^{i}
+$$
+其中$\sigma$是扩大系数。然后将每一列的权重相乘作为指标，**选择最大乘积**，用来评估聚合模式的强度。
+$$
+\phi(\omega_{<t}) = \prod_{i=c}^{t-1} \sigma \omega_{i,c}, 
+\quad \text{s.t.} \quad 
+c = \arg\max_{t-k \le j \le t-1} \prod_{i=j}^{t-1} \sigma \omega_{i,j}
+$$
+进而将$\phi(w_{<t})$作为惩罚项，惩罚选择相应token的项，即：
+$$
+p(x_t|x_{<t}) = \text{softmax}(\mathcal{H}(h_t) - \alpha\phi(w_{\le t}))_{x_t}, \quad s.t. x_t \in \mathcal{Y}
+$$
+其中$\phi(w_{\le t})$表示由待选token整合得到的tokens序列的attention权重。
