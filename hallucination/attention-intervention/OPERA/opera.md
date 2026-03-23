@@ -104,7 +104,7 @@ $$
 p(x_t|x_{<t}) = \text{softmax}(\mathcal{H}(h_t) - \alpha\phi(w_{\le t}))_{x_t}, \quad s.t. x_t \in \mathcal{Y}
 $$
 其中$\phi(w_{\le t})$表示由待选token整合得到的tokens序列的attention权重。
-整体流程如下图所示：
+这就是**over-trust penalty 过度信任惩罚**，整体流程如下图所示：
 <p align='center'><img src="./images/over-trust-penalty.png" width=75%></p>
 
 但由于聚合模式的发现具有滞后性，很可能即使尽力惩罚具有聚合模式的项，仍然无法打破前期就已经形成的聚合，因此我们需要一种"回滚"操作。
